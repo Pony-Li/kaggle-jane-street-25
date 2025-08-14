@@ -28,6 +28,22 @@ pytorch_lightning.seed_everything(params.seed)
 
 # 模型定义
 class GRUNetworkWithConv(LightningModule):
+
+    """
+    GRU 两层 (l=1,2) 时间步 t 的计算公式:
+
+    z_t^(l) = sigmoid( W_z^(l) x_t^(l) + U_z^(l) h_{t-1}^(l) + b_z^(l) )  # update gate
+    r_t^(l) = sigmoid( W_r^(l) x_t^(l) + U_r^(l) h_{t-1}^(l) + b_r^(l) )  # reset gate
+    ~h_t^(l) = tanh( W_h^(l) x_t^(l) + U_h^(l) (r_t^(l) ⊙ h_{t-1}^(l)) + b_h^(l) )  # candidate
+    h_t^(l) = (1 - z_t^(l)) ⊙ h_{t-1}^(l) + z_t^(l) ⊙ ~h_t^(l)  # new hidden
+
+    说明:
+    - 第一层输入: x_t^(1) = x_t (原始序列)
+    - 第二层输入: x_t^(2) = h_t^(1) (上一层输出)
+    - sigmoid = 1/(1 + e^(-x)), ⊙ 为逐元素乘法
+    - 权重 W 列数等于输入维度，方便对应 PyTorch 的实现
+    """
+
     def __init__(self, input_size, hidden_size, output_size, num_layers=2, learning_rate=1e-4, weight_decay=0.1):
         super().__init__()
         self.save_hyperparameters()  # 保存超参数
@@ -36,22 +52,35 @@ class GRUNetworkWithConv(LightningModule):
         self.batch_norm = nn.BatchNorm1d(input_size)  # 批归一化
         self.gate = nn.Linear(hidden_size, hidden_size)  # 门控线性层
         self.dense = nn.Sequential(nn.Linear(hidden_size, output_size))  # 全连接层
+        # 逐通道 (depthwise) 一维卷积: 每个通道独立用自己的 1×3 卷积核在时间维上做卷积, 没有跨通道混合
         self.gate_conv = nn.Conv1d(in_channels=hidden_size, out_channels=hidden_size, kernel_size=3, padding=2, groups=hidden_size)  # 1D卷积层
         self.prev_hidden_state = None  # 上一隐藏状态
         self.validation_step_outputs = []  # 验证步骤输出
 
     def forward(self, x):
-        x = x.squeeze(0)  # 去除多余的维度
-        batch_size, timestep, input_size = x.size()  # 获取输入形状
-        h0 = self._initialize_hidden_state(batch_size, x.device)  # 初始化隐藏状态
-        gru_outputs, hn = self.gru(x, h0)  # GRU前向传播
-        self.prev_hidden_state = hn.detach()  # 更新隐藏状态
-        output = gru_outputs.permute(0, 2, 1)  # 调整维度
-        gating_values = torch.sigmoid(self.gate_conv(output))[:, :, :output.size(-1)]  # 计算门控值
-        output = output * gating_values  # 应用门控
-        output = output.permute(0, 2, 1)  # 调整维度
-        output = self.dense(output)  # 全连接层
-        return output.squeeze(-1)  # 去除多余的维度
+
+        """
+        提示 (避免将来踩形状的坑):
+        在我的代码中, x 是单日的数据 shape: (1, 39, 968, num_features), batch_size=1 保证了 squeeze(0) 可以正常运行,
+        如果将来想把 DataLoader 的 batch_size 提大 (比如一次迭代返回 4 天的数据), 那么 squeeze(0) 会报错,
+        此时可以改成更稳妥的写法, 把 date 和 symbol 对应的维度合并成真正的 batch 维度再输入给 GRU 模型, 例如:
+        # x: (B_days, 39, 968, F)
+        B_days, S, T, F = x.shape
+        x = x.view(B_days * S, T, F)   # -> (B_days*39, 968, F)
+        """
+
+        # x: 单日数据, shape: (1, 39, 968, num_features)
+        x = x.squeeze(0)  # 去除多余的维度 shape: (39, 968, num_features)
+        batch_size, timestep, input_size = x.size()  # 获取输入形状, 这里的 batch_size 实际上是 num_symbols=39
+        h0 = self._initialize_hidden_state(batch_size, x.device)  # 初始化隐藏状态, shape: (num_layers=2, 39, 512)
+        gru_outputs, hn = self.gru(x, h0)  # GRU前向传播, gru_outputs: (39, 968, 512), hn: (2, 39, 512)
+        self.prev_hidden_state = hn.detach()  # 更新隐藏状态, shape: (2, 39, 512)
+        output = gru_outputs.permute(0, 2, 1)  # 调整维度, shape: (39, 512, 968)
+        gating_values = torch.sigmoid(self.gate_conv(output))[:, :, :output.size(-1)]  # 计算门控值, shape: (39, 512, 968)
+        output = output * gating_values  # 应用门控, shape: (39, 512, 968)
+        output = output.permute(0, 2, 1)  # 调整维度, 把时间维度重新放回中间, 为全连接层做准备, shape: (39, 968, 512)
+        output = self.dense(output)  # 全连接层, shape: (39, 968, 1)
+        return output.squeeze(-1)  # 去除多余的维度, shape: (39, 968)
 
     def _initialize_hidden_state(self, batch_size, device):
         if self.prev_hidden_state is None:
