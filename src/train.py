@@ -6,6 +6,8 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from dataset import TimeSeriesDataModule
 from model_gru import GRUNetworkWithConv, Hyperparameters
 from utils import calculate_r2, encode_column
+import warnings
+warnings.filterwarnings('ignore')
 
 def main():
     params = Hyperparameters()
@@ -22,7 +24,7 @@ def main():
     # 特征选择和预处理
     raw_data = raw_data.with_columns((pl.col('time_id')/967).alias('time'))
     for col in ["feature_09","feature_10","feature_11"]:
-        raw_data = encode_column(raw_data,col,category_mappings[col]) 
+        raw_data = encode_column(raw_data, col,category_mappings[col]) 
     raw_data = raw_data.to_pandas()  # 将数据转换为Pandas DataFrame
     
     # 划分训练集和验证集
@@ -32,6 +34,12 @@ def main():
     # 填充缺失值
     train_data[feature_columns] = train_data[feature_columns].fillna(0)  # 训练集填充0
     valid_data[feature_columns] = valid_data[feature_columns].fillna(0)  # 验证集填充0
+
+    print("the shape of training data: ", train_data.shape)  # (20687128, 94)
+    print("Column info: ", train_data.columns.tolist())
+    for col in train_data.columns[:3]:
+        # date_id — unique values: 560, time_id — unique values: 968, symbol_id — unique values: 39
+        print(f"{col} — unique values: {train_data[col].nunique()}")
 
     data_module = TimeSeriesDataModule(train_data, feature_columns, params.batch_size, valid_data=valid_data)
     data_module.setup()
