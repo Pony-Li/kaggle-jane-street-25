@@ -41,7 +41,7 @@ class JSGateway(kaggle_evaluation.core.templates.Gateway):
                 os.path.join(self.lags_path, f"date_id={date_id}"),
             ) # 从 self.lags_path 下读取当前日期 date_id 对应的滞后特征
             for time_id, test in test_batches: # test_batches 是经过 group_by 的 dataframe, 支持这样的二元组迭代遍历
-                # 当 time_id == 0 (一天的第一个时间点) 把完整的 lags 传入;否则传入 None (表示滞后特征已在第一个时间步加载)
+                # 当 time_id == 0 (一天的第一个时间点) 把完整的 lags 传入; 否则传入 None (表示滞后特征已在第一个时间步加载)
                 test_data = (test, lags if time_id[0] == 0 else None) # test 是 39 行的数据 (每个 symbol_id 为一行)
                 validation_data = test.select('row_id') # 仅从 test 中选取 row_id 列, 作为验证标识 (提交格式要求)
                 yield test_data, validation_data
