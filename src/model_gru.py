@@ -46,7 +46,9 @@ class GRUNetworkWithConv(LightningModule):
 
     def __init__(self, input_size, hidden_size, output_size, num_layers=2, learning_rate=1e-4, weight_decay=0.1):
         super().__init__()
-        self.save_hyperparameters()  # 保存超参数
+
+        # 保存超参数, self.save_hyperparameters() 会把传给 __init__ 的全部参数存到 self.hparams (一个易用的命名空间) 中
+        self.save_hyperparameters()
         self.gru = nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=True)  # GRU层
         self.layer_norm = nn.LayerNorm(hidden_size)  # 层归一化
         self.batch_norm = nn.BatchNorm1d(input_size)  # 批归一化
