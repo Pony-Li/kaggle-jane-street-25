@@ -23,7 +23,7 @@ The project includes:
 │   ├── train_data.parquet         # Filtered training data (date_id > 1100)
 │   └── valid_data.parquet         # Filtered validation data (date_id > 1640)
 
-├── kaggle_evaluation/            # Scripts to simulate online prediction via official interface
+├── kaggle_evaluation/             # Scripts to simulate online prediction via official interface
 
 ├── model/
 │   └── GRU.ckpt                   # Checkpoint of GRU model after offline training
