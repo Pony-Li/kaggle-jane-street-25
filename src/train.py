@@ -25,7 +25,7 @@ def main():
     raw_data = raw_data.with_columns((pl.col('time_id')/967).alias('time'))
     for col in ["feature_09","feature_10","feature_11"]:
         raw_data = encode_column(raw_data, col,category_mappings[col]) 
-    raw_data = raw_data.to_pandas()  # 将数据转换为Pandas DataFrame
+    raw_data = raw_data.to_pandas()  # 将数据转换为 Pandas DataFrame
     
     # 划分训练集和验证集
     valid_data = raw_data[raw_data['date_id'].between(1660, 1700)]  # 验证集
