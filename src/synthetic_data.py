@@ -38,7 +38,7 @@ print("row_id_offset:", row_id_offset)
 # 对已经经过 group_by 的 syn_test_partition 进行下面的二元组遍历, key 是 date_id, _df 是一个 date_id 对应的全部数据
 for key, _df in syn_test_partition.items():
     if key[0] >= 0: # 对于 date_id >= 0 的每个分组
-        os.makedirs(f"{output_dir}/date_id={key[0]}", exist_ok=True) # 建立子目录 test.parquet/date_id=xxx
+        os.makedirs(f"{output_dir}/date_id={key[0]}", exist_ok=True) # 建立子目录 synthetic_test.parquet/date_id=xxx
         _df = _df.with_columns(pl.col('row_id')-row_id_offset) # 调整 row_id, 保证编号连续
         _df.write_parquet(f"{output_dir}/date_id={key[0]}/part-0.parquet") # 写入 part-0.parquet 文件, 模仿 Kaggle 官方按日期存储 test 数据的方式
 
