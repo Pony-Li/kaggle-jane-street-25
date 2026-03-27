@@ -28,7 +28,7 @@ syn_test = syn_test.select(
 # 将 syn_test 按 date_id 进行分组, 返回一个字典 {date_id: 对应DataFrame}, 模拟 Kaggle 官方 test 数据的按日期分片结构
 syn_test_partition = syn_test.partition_by('date_id', maintain_order=True, as_dict=True)
 
-output_dir = "./data/test.parquet"
+output_dir = "./data/synthetic_test.parquet"
 os.makedirs(output_dir, exist_ok=True)
 
 # 如果有 date_id < 0 的行, 找到它们的最大 row_id, 作为偏移量 (一般用于确保 row_id 连续编号，从0开始)
@@ -53,7 +53,7 @@ syn_lag = syn_lag.rename({f'responder_{x}': f'responder_{x}_lag_1' for x in rang
 # 将 syn_lags 按 date_id 进行分组, 返回一个字典 {date_id: 对应DataFrame}, 模拟 Kaggle 官方 lags 数据的按日期分片结构
 syn_lag_partition = syn_lag.partition_by('date_id', maintain_order=True, as_dict=True)
 
-output_dir = "./data/lags.parquet"
+output_dir = "./data/synthetic_lags.parquet"
 os.makedirs(output_dir, exist_ok=True)
 
 for key, _df in syn_lag_partition.items():
